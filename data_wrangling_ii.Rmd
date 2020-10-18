@@ -1,5 +1,5 @@
 ---
-title: "reading_data_from_the_web"
+title: "data wrangling ii"
 author: "Leighanne Wang"
 date: "10/18/2020"
 output: github_document
@@ -7,6 +7,7 @@ output: github_document
 
 ```{r setup, include = FALSE}
 library(tidyverse)
+library(p8105.datasets)
 
 library(rvest)
 library(httr)
@@ -25,6 +26,8 @@ options(
 scale_colour_discrete = scale_color_viridis_d
 scale_fill_discrete = scale_fill_viridis_d
 ```
+
+# Data from the Web
 
 ## Scrape Table
 
@@ -123,16 +126,142 @@ pokemon_data$height
 pokemon_data$abilities
 ```
 
+# Strings and Factors
 
+```{r}
+string_vec = c("my", "name", "is", "jeff")
+str_detect(string_vec, "jeff") # detects where Jeff is
+str_detect(string_vec, "e") # detects where 'e' is
+str_replace(string_vec, "jeff", "Jeff") #replace one string with another
+```
 
+```{r}
+string_vec = c(
+  "i think we all rule for participating",
+  "i think i have been caught",
+  "i think this will be quite fun actually",
+  "it will be fun, i think"
+)
+str_detect(string_vec, "^i think") #detects only things that begin with "i think"
 
+str_detect(string_vec, "i think$") #detects only things that end with "i think"
+```
 
+```{r}
+string_vec = c(
+  "Y'all remember Pres. HW Bush?",
+  "I saw a green bush",
+  "BBQ and Bushwalking at Molonglo Gorge",
+  "BUSH -- LIVE IN CONCERT!!"
+  )
 
+str_detect(string_vec,"[Bb]ush") # will find and match either B or b characters and the rest
+```
 
+```{r}
+string_vec = c(
+  'Its 7:11 in the evening',
+  'want to go to 7-11?',
+  'my flight is AA711',
+  'NetBios: scanning ip 203.167.114.66'
+  )
 
+str_detect(string_vec, "7.11") # will find anything for the with the '.', to find only the '7.11' then do "7\\.11"
+```
 
+```{r}
+string_vec = c(
+  'The CI is [2, 5]',
+  ':-]',
+  ':-[',
+  'I found the answer on pages [6-7]'
+  )
 
+str_detect(string_vec, "\\[")
+```
 
+```{r}
+vec_sex = factor(c("male", "male", "female", "female"))
+vec_sex
+
+#relevel factor
+vec_sex = fct_relevel(vec_sex, "male")
+vec_sex
+
+as.numeric(vec_sex)
+```
+
+## NSDUH dataset
+
+```{r}
+nsduh_url = "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads/2k15StateFiles/NSDUHsaeShortTermCHG2015.htm"
+
+table_marj = 
+  read_html(nsduh_url) %>% 
+  html_nodes(css = "table") %>% 
+  first() %>%
+  html_table() %>%
+  slice(-1) %>%
+  as_tibble()
+```
+
+```{r}
+data_marj = 
+  table_marj %>% 
+  select(-contains("P Value")) %>% 
+  pivot_longer(
+    -State, 
+    names_to = "age_year",
+    values_to = "percent"
+  ) %>% 
+  separate(age_year, into = c("age", "year"), sep = "\\(") %>% 
+  mutate(
+    year = str_replace(year, "\\)", ""),
+    percent = str_replace(percent, "[a-c]$", ""), 
+    percent = as.numeric(percent)
+  ) %>% 
+  filter(!(State %in% c("Total U.S.", "Northeast", "Midwest", "South", "West"))
+  )
+```
+
+With factors
+
+```{r}
+data_marj %>%
+  filter(age == "12-17") %>% 
+  mutate(State = fct_reorder(State, percent)) %>% 
+  ggplot(aes(x = State, y = percent, color = year)) + 
+    geom_point() + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+## Weather data
+
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728", "USC00519397", "USS0023B17S"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(
+      id, 
+      USW00094728 = "CentralPark_NY", 
+      USC00519397 = "Waikiki_HA",
+      USS0023B17S = "Waterhole_WA"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+```
+
+```{r}
+weather_df %>%
+  mutate(name = forcats::fct_relevel(name, c("Waikiki_HA", "CentralPark_NY", "Waterhole_WA"))) %>% 
+  ggplot(aes(x = name, y = tmax)) + 
+  geom_violin(aes(fill = name), color = "blue", alpha = .5) + 
+  theme(legend.position = "bottom")
+```
 
 
 
